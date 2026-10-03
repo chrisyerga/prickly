@@ -1,0 +1,66 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://prickly.newtricks.ai
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.sha }},ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - uses: appleboy/ssh-action@v1.2.0
+        env:
+          DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          IMAGE: ghcr.io/${{ github.repository }}:${{ github.sha }}
+        with:
+          host: ${{ secrets.PORCH_HOST }}
+          username: ${{ secrets.PORCH_USER }}
+          key: ${{ secrets.PORCH_SSH_KEY }}
+          envs: DIGITALOCEAN_TOKEN,IMAGE
+          script: |
+            set -eu
+            # Non-interactive SSH shells on the host don't load nvm.
+            if ! command -v npx >/dev/null; then
+              export NVM_DIR="$HOME/.nvm"
+              . "$NVM_DIR/nvm.sh"
+            fi
+            npx -y @lindale/porch service register \
+              --service-id prickly \
+              --domain prickly.newtricks.ai \
+              --container prickly-web \
+              --port 8000 \
+              --image "$IMAGE" \
+              --deploy-path /opt/prickly \
+              --health-url https://prickly.newtricks.ai/healthz \
+              --json

@@ -1,0 +1,12 @@
+.venv
+.git
+.github
+.cursor
+.vscode
+**/__pycache__
+.pytest_cache
+.ruff_cache
+tests
+scripts
+*.md
+.env*

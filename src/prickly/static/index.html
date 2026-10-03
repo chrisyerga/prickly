@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>prickly · voice house on Cactus Whistle + Needle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <h1>prickly<span class="dot">.</span></h1>
+      <p class="tag">A house you talk to. <em>Whistle</em> hears it, <em>Needle</em> decides, all on one CPU core.</p>
+    </div>
+    <div class="sheet-meta">
+      <div><span>sheet</span>A-01</div>
+      <div><span>models</span>whistle 17 MB · needle3 14 MB</div>
+      <div><span>host</span>milo · 1 vCPU</div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="plan" aria-label="Floor plan">
+      <svg id="house" viewBox="0 0 800 520" role="img" aria-label="House floor plan">
+        <defs>
+          <pattern id="minor" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M20 0H0V20" fill="none" stroke="var(--grid)" stroke-width="0.5"/>
+          </pattern>
+          <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="18"/>
+          </filter>
+          <clipPath id="clip-living_room"><rect x="40" y="40" width="420" height="250"/></clipPath>
+          <clipPath id="clip-kitchen"><rect x="460" y="40" width="300" height="250"/></clipPath>
+          <clipPath id="clip-bedroom"><rect x="40" y="290" width="280" height="190"/></clipPath>
+          <clipPath id="clip-bathroom"><rect x="320" y="290" width="140" height="190"/></clipPath>
+          <clipPath id="clip-office"><rect x="460" y="290" width="300" height="190"/></clipPath>
+        </defs>
+        <rect width="800" height="520" fill="url(#minor)"/>
+        <g id="rooms"></g>
+        <g id="walls" fill="none" stroke="var(--line)" stroke-width="3" stroke-linecap="square">
+          <rect x="40" y="40" width="720" height="440"/>
+          <path d="M460 40V140 M460 190V290 M40 290H140 M190 290H320 M320 290H390 M430 290H460 M460 290H560 M610 290H760 M320 290V480 M460 290V480"/>
+        </g>
+        <g id="fixtures"></g>
+      </svg>
+      <div class="legend">
+        <span><i class="sw light"></i>light glow = brightness</span>
+        <span><i class="sw blind"></i>window hatch = blinds closed</span>
+        <span><i class="sw lock"></i>locked</span>
+        <span><i class="sw unlock"></i>unlocked</span>
+        <button id="reset" class="link">reset house</button>
+      </div>
+    </section>
+
+    <aside class="console">
+      <div class="talk">
+        <button id="ptt" class="ptt" aria-label="Hold to talk">
+          <span class="ring"></span>
+          <span class="label">hold<br>to talk</span>
+        </button>
+        <div class="talk-side">
+          <div class="mode" role="radiogroup" aria-label="Inference path">
+            <label><input type="radio" name="mode" value="pipeline" checked><span>pipeline</span></label>
+            <label><input type="radio" name="mode" value="fused"><span>fused</span></label>
+          </div>
+          <p class="hint" id="mode-hint"></p>
+          <p class="hint">or hold <kbd>space</kbd></p>
+          <div class="meter"><div id="level"></div></div>
+          <p class="status" id="status">mic idle</p>
+        </div>
+      </div>
+
+      <div class="clips">
+        <span class="cap">no mic? play a clip</span>
+        <button data-clip="kitchen-dim">"dim the kitchen to 30…"</button>
+        <button data-clip="bedroom-purple">"bedroom purple…"</button>
+        <button data-clip="thermostat">"thermostat 68…"</button>
+        <button data-clip="pizza">"order a pizza"</button>
+      </div>
+
+      <form id="text-form" class="text-form" autocomplete="off">
+        <input id="text" name="text" placeholder="or type: unlock the garage and open the office blinds" maxlength="500">
+        <button type="submit">send</button>
+      </form>
+
+      <section class="readout" aria-live="polite">
+        <div class="heard">
+          <span class="cap">heard</span>
+          <p id="transcript" class="transcript">—</p>
+        </div>
+        <div class="bar-wrap">
+          <div class="cap-row"><span class="cap">latency</span><span id="total" class="total">—</span></div>
+          <div id="waterfall" class="waterfall"></div>
+          <div id="bar-legend" class="bar-legend"></div>
+        </div>
+        <dl id="stats" class="stats"></dl>
+        <div>
+          <span class="cap">calls</span>
+          <ol id="calls" class="calls"><li class="muted">nothing yet</li></ol>
+        </div>
+        <p id="reasoning" class="reasoning"></p>
+      </section>
+
+      <section class="history">
+        <span class="cap">log</span>
+        <table><tbody id="history"></tbody></table>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="/static/app.js"></script>
+</body>
+</html>

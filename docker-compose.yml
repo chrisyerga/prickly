@@ -1,0 +1,10 @@
+services:
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/chrisyerga/prickly:latest}
+    container_name: prickly-web
+    restart: unless-stopped
+    networks:
+      - porch
+networks:
+  porch:
+    external: true

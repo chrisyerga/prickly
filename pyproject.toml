@@ -1,0 +1,45 @@
+[project]
+name = "prickly"
+version = "0.1.0"
+description = "Voice smart-home demo for Cactus Whistle (speech-to-text) and Needle (tool calling)"
+authors = [
+    { name = "Chris Yerga", email = "chris@domatic.io" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "cactus-needle>=3.1.0",
+    "fastapi>=0.142.2",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+prickly = "prickly:main"
+
+[build-system]
+requires = ["uv_build>=0.12.9,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pyright>=1.1.414",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["models: loads the real Whistle and Needle models (set PRICKLY_SKIP_MODELS=1 to skip)"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"
