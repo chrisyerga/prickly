@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>prickly · Whistle speech-to-text latency</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <h1><a href="/">prickly<span class="dot">.</span></a></h1>
+      <p class="tag">Just the ears. <em>Whistle</em> speech-to-text on its own, with no tool calling, so you can see what transcription alone costs.</p>
+      <nav class="pages"><a href="/">overview</a><a href="/house">house</a><a href="/whistle" aria-current="page">whistle only</a></nav>
+    </div>
+    <div class="sheet-meta">
+      <div><span>sheet</span>A-02</div>
+      <div><span>model</span>whistle 17 MB</div>
+      <div><span>languages</span>en de fr es it nl pl</div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="scope" aria-label="Waveform and transcript">
+      <div class="scope-frame">
+        <div class="cap-row"><span class="cap">waveform · word timings</span><span id="scope-len" class="cap"></span></div>
+        <canvas id="wave" aria-label="Waveform of the last audio with word spans"></canvas>
+      </div>
+      <div class="heard big">
+        <div class="cap-row"><span class="cap">heard</span><span id="lang" class="cap"></span></div>
+        <p id="transcript" class="transcript muted">Hold the button and say anything, in any of seven languages.</p>
+        <p class="hint">word opacity = Whistle's confidence · hover a word for its timing</p>
+      </div>
+    </section>
+
+    <aside class="console">
+      <div class="talk">
+        <button id="ptt" class="ptt" aria-label="Hold to talk">
+          <span class="ring"></span>
+          <span class="label">hold<br>to talk</span>
+        </button>
+        <div class="talk-side">
+          <div class="options">
+            <label>language
+              <select id="language">
+                <option value="">auto-detect</option>
+                <option value="en" selected>en</option>
+                <option value="de">de</option>
+                <option value="fr">fr</option>
+                <option value="es">es</option>
+                <option value="it">it</option>
+                <option value="nl">nl</option>
+                <option value="pl">pl</option>
+              </select>
+            </label>
+            <label class="check"><input id="words" type="checkbox" checked> word timestamps</label>
+          </div>
+          <p class="hint">or hold <kbd>space</kbd></p>
+          <div class="meter"><div id="level"></div></div>
+          <p class="status" id="status">mic idle</p>
+        </div>
+      </div>
+
+      <div class="text-form keywords">
+        <input id="keywords" placeholder="keyword biasing, comma separated: thermostat, Kubernetes" maxlength="400">
+        <button id="house-words" type="button" title="Fill in the vocabulary the house demo uses">house words</button>
+      </div>
+
+      <div class="clips">
+        <span class="cap">no mic? play a clip</span>
+        <button data-clip="thermostat">"thermostat 68…" en</button>
+        <button data-clip="en-long">13 s of English</button>
+        <button data-clip="de-weather" data-lang="de">"Morgen wird es…" de</button>
+        <button data-clip="fr-meeting" data-lang="fr">"La réunion…" fr</button>
+        <button data-clip="es-coffee" data-lang="es">"Quiero un café…" es</button>
+      </div>
+
+      <section class="readout" aria-live="polite">
+        <div class="bar-wrap">
+          <div class="cap-row"><span class="cap">latency</span><span id="total" class="total">—</span></div>
+          <div id="waterfall" class="waterfall"></div>
+          <div id="bar-legend" class="bar-legend"></div>
+        </div>
+        <dl id="stats" class="stats"></dl>
+      </section>
+
+      <section class="history">
+        <div class="cap-row"><span class="cap">log</span><span id="summary" class="cap"></span></div>
+        <table>
+          <thead><tr><th>src</th><th>audio</th><th>whistle</th><th>ttft</th><th>rtf</th><th>text</th></tr></thead>
+          <tbody id="history"></tbody>
+        </table>
+      </section>
+    </aside>
+  </main>
+
+  <script type="module" src="/static/whistle.js"></script>
+</body>
+</html>

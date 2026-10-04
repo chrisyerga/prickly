@@ -2,9 +2,15 @@
 
 A voice-controlled house for trying out [Cactus Compute](https://cactuscompute.com)'s on-device models. Hold to talk, and **Whistle** (speech-to-text) transcribes what you said. **Needle** (tool calling) then turns the transcript into function calls that switch lights, set colors, lock doors, move blinds, and set the thermostat on a live floor plan. Each request shows a latency waterfall, so you can see where the time goes.
 
-Live at **[prickly.newtricks.ai](https://prickly.newtricks.ai)**.
+Live at **[prickly.newtricks.ai](https://prickly.newtricks.ai)**. The overview page there links to the two demos: the house at **[/house](https://prickly.newtricks.ai/house)** and Whistle on its own at **[/whistle](https://prickly.newtricks.ai/whistle)**.
 
 ![prickly: floor plan, push-to-talk, and the latency breakdown for "Dim the kitchen lights to 30% and lock the front door"](docs/screenshot.png)
+
+### Whistle only
+
+Needle accounts for most of the latency on slow CPUs, so **[/whistle](https://prickly.newtricks.ai/whistle)** runs speech-to-text by itself, with the same push-to-talk. It draws the waveform with Whistle's word timings on top and sets each word's opacity from its confidence. The latency bar splits Whistle's time into first token (encode plus prefill) and decode, and the page shows the real-time factor and running medians. You can switch language detection (en, de, fr, es, it, nl, pl), word timestamps and keyword biasing on and off to see what each costs. There are sample clips in English, German, French and Spanish, including a 13 s English clip for checking how latency scales with audio length.
+
+![Whistle-only page: waveform with word spans, transcript, and latency breakdown for a German clip](docs/whistle.png)
 
 ## How it works
 
@@ -70,7 +76,7 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/). The first run downlo
 
 ```bash
 uv sync
-uv run prickly                 # http://localhost:8000
+uv run prickly                 # http://localhost:8000 (overview), /house, /whistle
 PORT=8077 uv run prickly       # or pick a port
 ```
 
@@ -81,6 +87,7 @@ Allow the microphone and hold the button (or Space) to talk. The sample-clip but
 | Route | What it does |
 | --- | --- |
 | `POST /api/command?mode=pipeline\|fused` | Body is raw little-endian float32 mono samples at 16 kHz, 0.1–30 s. Returns the transcript, executed calls, suppressed calls, timings, and house state. |
+| `POST /api/transcribe?language=&keywords=&words=` | Whistle only, with the same audio body. `language` is optional (omit it to auto-detect), `keywords` can be repeated (up to 32), and `words=false` skips word timestamps. Returns the transcript, detected language, words, and timings. |
 | `POST /api/text` | `{"text": "turn on the kitchen light"}` sends text straight to Needle. |
 | `GET /api/state`, `POST /api/reset` | Per-browser house state, keyed by a cookie. |
 | `GET /healthz` | Liveness check plus the model load time. |
@@ -107,7 +114,8 @@ src/prickly/
   engine.py   Whistle + Needle wrapper: one lock, warm-up, pipeline/fused modes, timings
   home.py     HouseState and its tool methods, schemas, keyword list, system prompt
   main.py     FastAPI app: sessions, validation, routes, static files
-  static/     index.html, app.js (AudioWorklet capture + UI), styles.css, sample clips
+  static/     landing.html (/), house.html + app.js (/house), whistle.html + whistle.js (/whistle),
+              audio.js (shared mic capture, push-to-talk, clips), styles.css, img/, sample clips
 tests/        unit tests, API tests with a fake engine, real-model tests
 scripts/      tune.py prompt/tool tuning harness
 ```

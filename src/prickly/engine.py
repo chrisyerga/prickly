@@ -13,7 +13,7 @@ import ctypes
 import json
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -28,6 +28,17 @@ MAX_SAMPLES = SAMPLE_RATE * MAX_SECONDS
 MIN_SAMPLES = SAMPLE_RATE // 10
 
 Mode = Literal["pipeline", "fused"]
+Language = Literal["en", "de", "fr", "es", "it", "nl", "pl"]
+
+
+@dataclass
+class Transcript:
+    """Whistle output on its own, with no tool planning."""
+
+    text: str
+    language: str | None
+    words: list[dict[str, Any]]
+    timings: dict[str, float | None] = field(default_factory=dict)
 
 
 @dataclass
@@ -76,6 +87,38 @@ class Engine:
         self.transcribe_and_plan(silence, "pipeline")
         self.transcribe_and_plan(silence, "fused")
         self.plan_text("turn on the kitchen light")
+        self.transcribe(silence, language=None, keywords=(), word_timestamps=True)
+
+    def transcribe(
+        self,
+        samples: array.array,
+        *,
+        language: Language | None,
+        keywords: Sequence[str],
+        word_timestamps: bool,
+    ) -> Transcript:
+        """Speech to text only. `language=None` lets Whistle detect it."""
+        with self._locked() as queue_ms:
+            t0 = time.perf_counter_ns()
+            heard = self._whistle.transcribe(
+                samples,
+                language=language,
+                keywords=list(keywords) or None,
+                word_timestamps=word_timestamps,
+            )
+            t1 = time.perf_counter_ns()
+        return Transcript(
+            text=(heard.get("text") or "").strip(),
+            language=heard.get("language"),
+            words=list(heard.get("words") or []),
+            timings={
+                "queue_ms": queue_ms,
+                "audio_ms": round(len(samples) / SAMPLE_RATE * 1000, 1),
+                "whistle_ms": _ms(t0, t1),
+                "whistle_ttft_ms": heard.get("ttft_ms"),
+                "whistle_tps": heard.get("decode_tps"),
+            },
+        )
 
     def plan_text(self, text: str) -> Plan:
         with self._locked() as queue_ms:

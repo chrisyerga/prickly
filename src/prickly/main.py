@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections import OrderedDict
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Any, Protocol
@@ -16,12 +16,14 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from .engine import Mode, Plan, pcm_from_bytes
+from .engine import Language, Mode, Plan, Transcript, pcm_from_bytes
 from .home import HouseState, apply_call
 
 STATIC_DIR = Path(__file__).parent / "static"
 SESSION_COOKIE = "prickly_sid"
 MAX_SESSIONS = 500
+MAX_KEYWORDS = 32
+MAX_KEYWORD_CHARS = 48
 
 
 class Planner(Protocol):
@@ -30,6 +32,15 @@ class Planner(Protocol):
     def plan_text(self, text: str) -> Plan: ...
 
     def transcribe_and_plan(self, samples: Any, mode: Mode) -> Plan: ...
+
+    def transcribe(
+        self,
+        samples: Any,
+        *,
+        language: Language | None,
+        keywords: Sequence[str],
+        word_timestamps: bool,
+    ) -> Transcript: ...
 
 
 class ToolCall(BaseModel):
@@ -48,6 +59,20 @@ class CommandResult(BaseModel):
     confidence: float | None
     timings: dict[str, float | None]
     state: dict[str, Any]
+
+
+class Word(BaseModel):
+    word: str
+    start: float
+    end: float
+    probability: float
+
+
+class TranscribeResult(BaseModel):
+    transcript: str
+    language: str | None
+    words: list[Word]
+    timings: dict[str, float | None]
 
 
 class TextCommand(BaseModel):
@@ -168,9 +193,47 @@ def create_app(engine_factory: Callable[[], Planner] = _default_engine) -> FastA
         result.timings["server_ms"] = round((time.perf_counter_ns() - started) / 1e6, 2)
         return result
 
-    @app.get("/", include_in_schema=False)
-    def index() -> FileResponse:
-        return FileResponse(STATIC_DIR / "index.html", headers={"Cache-Control": "no-cache"})
+    @app.post("/api/transcribe")
+    async def transcribe(
+        request: Request,
+        language: Annotated[Language | None, Query()] = None,
+        keywords: Annotated[list[str] | None, Query(max_length=MAX_KEYWORDS)] = None,
+        words: Annotated[bool, Query()] = True,
+    ) -> TranscribeResult:
+        """Whistle only. Body: raw little-endian float32 mono samples at 16 kHz."""
+        started = time.perf_counter_ns()
+        terms = [k.strip() for k in keywords or [] if k.strip()]
+        if any(len(k) > MAX_KEYWORD_CHARS for k in terms):
+            raise HTTPException(422, f"keywords must be at most {MAX_KEYWORD_CHARS} characters")
+        try:
+            samples = pcm_from_bytes(await request.body())
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        heard = await run_in_threadpool(
+            lambda: engine(request).transcribe(
+                samples, language=language, keywords=terms, word_timestamps=words
+            )
+        )
+        timings = {
+            **heard.timings,
+            "server_ms": round((time.perf_counter_ns() - started) / 1e6, 2),
+        }
+        return TranscribeResult(
+            transcript=heard.text,
+            language=heard.language,
+            words=[Word.model_validate(w) for w in heard.words],
+            timings=timings,
+        )
+
+    def page(name: str) -> Callable[[], FileResponse]:
+        def serve() -> FileResponse:
+            return FileResponse(STATIC_DIR / name, headers={"Cache-Control": "no-cache"})
+
+        return serve
+
+    app.get("/", include_in_schema=False)(page("landing.html"))
+    app.get("/house", include_in_schema=False)(page("house.html"))
+    app.get("/whistle", include_in_schema=False)(page("whistle.html"))
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     return app

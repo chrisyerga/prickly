@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>prickly · on-device speech and tool calling with Cactus Whistle + Needle</title>
+  <meta name="description" content="Two small demos of Cactus Compute's Whistle speech-to-text and Needle tool-calling models, running on a CPU with no cloud API.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand">
+      <h1><a href="/">prickly<span class="dot">.</span></a></h1>
+      <p class="tag">Two small demos of <a href="https://cactuscompute.com">Cactus Compute</a>'s on-device models. <em>Whistle</em> turns speech into text and <em>Needle</em> turns text into function calls, both on a plain CPU with no GPU and no cloud API.</p>
+      <nav class="pages"><a href="/" aria-current="page">overview</a><a href="/house">house</a><a href="/whistle">whistle only</a></nav>
+    </div>
+    <div class="sheet-meta">
+      <div><span>sheet</span>00 · index</div>
+      <div><span>models</span>whistle 17 MB · needle3 14 MB</div>
+      <div><span>stack</span>python · fastapi</div>
+    </div>
+  </header>
+
+  <main class="landing">
+    <div class="demos">
+      <a class="demo" href="/house">
+        <img src="/static/img/house.jpg" alt="The house demo: a floor plan with lit rooms and a latency breakdown" width="1100" height="733">
+        <div class="demo-body">
+          <span class="cap">sheet A-01 · whistle + needle</span>
+          <h2>The house</h2>
+          <p>Hold to talk and say something like “dim the kitchen to 30% and lock the front door.” Whistle transcribes it, Needle picks from twelve typed tools, and the floor plan updates.</p>
+          <ul>
+            <li>Compare <b>pipeline</b> (two model calls) with <b>fused</b> (one call, audio in and tool calls out)</li>
+            <li>A latency waterfall for every stage, from network to tool execution</li>
+            <li>Calls Needle couldn't ground in what you said are shown struck through</li>
+          </ul>
+          <span class="go">open the house →</span>
+        </div>
+      </a>
+
+      <a class="demo" href="/whistle">
+        <img src="/static/img/whistle.jpg" alt="The Whistle demo: a waveform with word timings above a German transcript" width="1100" height="733">
+        <div class="demo-body">
+          <span class="cap">sheet A-02 · whistle only</span>
+          <h2>Just the ears</h2>
+          <p>Speech-to-text on its own, so you can see what transcription costs without Needle in the way. On slow CPUs, Needle accounts for most of the house demo's latency.</p>
+          <ul>
+            <li>Waveform with per-word timings, and transcript words shaded by confidence</li>
+            <li>Time to first token vs decode, real-time factor, and running medians</li>
+            <li>Seven languages with auto-detect, plus switchable word timestamps and keyword biasing</li>
+          </ul>
+          <span class="go">open whistle →</span>
+        </div>
+      </a>
+    </div>
+
+    <section class="numbers">
+      <span class="cap">what to expect · median of the bundled clips, warm models</span>
+      <table>
+        <thead><tr><th></th><th>Whistle, ~3 s of speech</th><th>Whistle first token</th><th>Full voice command</th></tr></thead>
+        <tbody>
+          <tr><td>Apple M4</td><td>16–30 ms</td><td>3–8 ms</td><td>~90–145 ms</td></tr>
+          <tr><td>milo · 1 shared x86 vCPU</td><td>720–870 ms</td><td>220–435 ms</td><td>~1.7–4.3 s</td></tr>
+        </tbody>
+      </table>
+      <p class="hint">prickly.newtricks.ai runs on milo, so expect the second row here. A voice command can't finish faster than Needle can read its twelve tool schemas, and on one slow core that takes most of the time.</p>
+    </section>
+  </main>
+</body>
+</html>

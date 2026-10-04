@@ -1,5 +1,5 @@
-const TARGET_RATE = 16000;
-const MAX_SECONDS = 30;
+import { TARGET_RATE, fmt, playClip, pushToTalk, timedJson } from "./audio.js";
+
 const SVG = "http://www.w3.org/2000/svg";
 
 const ROOMS = {
@@ -39,7 +39,6 @@ const el = (tag, attrs = {}, parent) => {
   if (parent) parent.appendChild(node);
   return node;
 };
-const fmt = (ms) => (ms == null ? "—" : ms >= 100 ? `${ms.toFixed(0)} ms` : `${ms.toFixed(1)} ms`);
 
 // ---------- floor plan ----------
 
@@ -225,11 +224,7 @@ function setStatus(text, cls = "") {
 }
 
 async function call(url, init, source) {
-  const t0 = performance.now();
-  const res = await fetch(url, init);
-  const rtt = performance.now() - t0;
-  const body = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : `HTTP ${res.status}`);
+  const { body, rtt } = await timedJson(url, init);
   showResult(body, rtt, source);
 }
 
@@ -247,139 +242,22 @@ async function sendAudio(samples, source) {
   }
 }
 
-// ---------- audio capture ----------
-
-// Low-pass by averaging over the decimation window, then linear interpolation.
-function resample(input, fromRate) {
-  if (fromRate === TARGET_RATE) return input;
-  const ratio = fromRate / TARGET_RATE;
-  const out = new Float32Array(Math.floor(input.length / ratio));
-  const half = Math.max(1, Math.floor(ratio / 2));
-  for (let i = 0; i < out.length; i++) {
-    const center = i * ratio;
-    const lo = Math.max(0, Math.floor(center) - half);
-    const hi = Math.min(input.length - 1, Math.floor(center) + half);
-    let sum = 0;
-    for (let j = lo; j <= hi; j++) sum += input[j];
-    out[i] = sum / (hi - lo + 1);
-  }
-  return out;
-}
-
-const WORKLET = `
-class Tap extends AudioWorkletProcessor {
-  process(inputs) {
-    const ch = inputs[0] && inputs[0][0];
-    if (ch) this.port.postMessage(ch.slice(0));
-    return true;
-  }
-}
-registerProcessor("tap", Tap);
-`;
-
-const mic = { ctx: null, node: null, chunks: [], recording: false, startedAt: 0 };
-
-async function ensureMic() {
-  if (mic.ctx) return;
-  const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-  });
-  const ctx = new AudioContext();
-  const url = URL.createObjectURL(new Blob([WORKLET], { type: "application/javascript" }));
-  await ctx.audioWorklet.addModule(url);
-  const source = ctx.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(ctx, "tap");
-  node.port.onmessage = ({ data }) => {
-    let peak = 0;
-    for (const v of data) peak = Math.max(peak, Math.abs(v));
-    $("level").style.width = `${Math.min(100, peak * 140)}%`;
-    if (mic.recording) mic.chunks.push(data);
-  };
-  source.connect(node);
-  mic.ctx = ctx;
-  mic.node = node;
-}
-
-async function startTalking() {
-  if (mic.recording) return;
-  try {
-    await ensureMic();
-  } catch (err) {
-    setStatus(`mic unavailable: ${err.message}. Try a clip or type instead.`, "error");
-    return;
-  }
-  await mic.ctx.resume();
-  mic.chunks = [];
-  mic.recording = true;
-  mic.startedAt = performance.now();
-  $("ptt").classList.add("live");
-  setStatus("listening… release to send", "live");
-}
-
-async function stopTalking() {
-  if (!mic.recording) return;
-  await new Promise((r) => setTimeout(r, 120));
-  mic.recording = false;
-  $("ptt").classList.remove("live");
-  $("level").style.width = "0";
-  const total = mic.chunks.reduce((n, c) => n + c.length, 0);
-  const raw = new Float32Array(total);
-  let offset = 0;
-  for (const c of mic.chunks) {
-    raw.set(c, offset);
-    offset += c.length;
-  }
-  let samples = resample(raw, mic.ctx.sampleRate);
-  if (samples.length < TARGET_RATE * 0.3) {
-    setStatus("too short: hold the button while you speak", "error");
-    return;
-  }
-  samples = samples.slice(0, TARGET_RATE * MAX_SECONDS);
-  await sendAudio(samples, "mic");
-}
-
-async function playClip(name) {
-  setStatus(`decoding clip ${name}`, "busy");
-  const bytes = await (await fetch(`/static/clips/${name}.wav`)).arrayBuffer();
-  const ctx = new AudioContext();
-  const audio = await ctx.decodeAudioData(bytes.slice(0));
-  const src = ctx.createBufferSource();
-  src.buffer = audio;
-  src.connect(ctx.destination);
-  src.start();
-  const samples = resample(audio.getChannelData(0), audio.sampleRate);
-  await sendAudio(new Float32Array(samples), "clip");
-  setTimeout(() => ctx.close(), audio.duration * 1000 + 200);
-}
-
 // ---------- wiring ----------
 
 function wire() {
-  const ptt = $("ptt");
-  ptt.addEventListener("pointerdown", (e) => {
-    ptt.setPointerCapture(e.pointerId);
-    startTalking();
-  });
-  ptt.addEventListener("pointerup", stopTalking);
-  ptt.addEventListener("pointercancel", stopTalking);
-  ptt.addEventListener("contextmenu", (e) => e.preventDefault());
-
-  const typing = () => document.activeElement === $("text");
-  window.addEventListener("keydown", (e) => {
-    if (e.code === "Space" && !e.repeat && !typing()) {
-      e.preventDefault();
-      startTalking();
-    }
-  });
-  window.addEventListener("keyup", (e) => {
-    if (e.code === "Space" && !typing()) {
-      e.preventDefault();
-      stopTalking();
-    }
+  pushToTalk({
+    button: $("ptt"),
+    level: $("level"),
+    setStatus,
+    onAudio: (samples) => sendAudio(samples, "mic"),
+    isTyping: () => document.activeElement === $("text"),
   });
 
   for (const b of document.querySelectorAll("[data-clip]")) {
-    b.addEventListener("click", () => playClip(b.dataset.clip));
+    b.addEventListener("click", async () => {
+      setStatus(`decoding clip ${b.dataset.clip}`, "busy");
+      await sendAudio(await playClip(b.dataset.clip), "clip");
+    });
   }
 
   $("text-form").addEventListener("submit", async (e) => {
