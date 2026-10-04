@@ -8,5 +8,6 @@
 .ruff_cache
 tests
 scripts
+docs
 *.md
 .env*
